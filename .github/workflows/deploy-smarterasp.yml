@@ -58,7 +58,7 @@ jobs:
             throw "WEBSITE_NAME does not match the configured SmarterASP site."
           }
 
-          $computerName = $env:SERVER_COMPUTER_NAME
+          $computerName = $env:SERVER_COMPUTER_NAME.Replace("MsDeploy.axd", "msdeploy.axd")
           $username = $env:SERVER_USERNAME
           $password = $env:SERVER_PASSWORD
           $deployArguments = @(
