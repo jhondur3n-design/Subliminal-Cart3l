@@ -1,0 +1,44 @@
+name: Deploy to SmarterASP.NET (FTP)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v6.0.0
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test --configuration Release --no-build
+
+      - name: Publish application
+        run: dotnet publish SubliminalCart3lBot.csproj --configuration Release --no-build --output ./release
+
+      - name: Deploy to SmarterASP with FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: win8244.site4now.net
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          protocol: ftp
+          port: 21
+          local-dir: ./release/
+          server-dir: /site1/
+          dangerous-clean-slate: false
+          state-name: .ftp-deploy-sync-state.json
