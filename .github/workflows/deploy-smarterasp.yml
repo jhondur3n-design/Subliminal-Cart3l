@@ -64,7 +64,7 @@ jobs:
           $deployArguments = @(
             "-verb:sync"
             "-source:contentPath=$sourcePath"
-            "-dest:contentPath=$siteName,computerName=$computerName,userName=$username,password=$password,authType=Basic"
+            "-dest:contentPath=$siteName,computerName=$computerName,userName=$username,password=$password,authType=Basic,includeAcls=`"False`""
             "-allowUntrusted"
             "-enableRule:AppOffline"
             "-enableRule:DoNotDeleteRule"
