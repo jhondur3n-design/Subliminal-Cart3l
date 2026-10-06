@@ -1,0 +1,61 @@
+name: Deploy to SmarterASP.NET
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test --configuration Release --no-build
+
+      - name: Publish
+        run: dotnet publish --configuration Release --no-build --output ./release
+
+      - name: Deploy with WebDeploy
+        shell: pwsh
+        env:
+          WEBSITE_NAME: ${{ secrets.WEBSITE_NAME }}
+          SERVER_COMPUTER_NAME: ${{ secrets.SERVER_COMPUTER_NAME }}
+          SERVER_USERNAME: ${{ secrets.SERVER_USERNAME }}
+          SERVER_PASSWORD: ${{ secrets.SERVER_PASSWORD }}
+        run: |
+          $msdeployPaths = @(
+            "$env:ProgramFiles\IIS\Microsoft Web Deploy V3\msdeploy.exe",
+            "${env:ProgramFiles(x86)}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
+          )
+          $msdeploy = $msdeployPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $msdeploy) {
+            throw "Microsoft WebDeploy (msdeploy.exe) was not found on this runner."
+          }
+
+          $destination = "contentPath=$env:WEBSITE_NAME,computerName=$env:SERVER_COMPUTER_NAME,userName=$env:SERVER_USERNAME,password=$env:SERVER_PASSWORD,authType=Basic"
+          & $msdeploy `
+            -verb:sync `
+            -source:contentPath=./release `
+            "-dest:$destination" `
+            -allowUntrusted `
+            -enableRule:AppOffline `
+            -enableRule:DoNotDeleteRule
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "WebDeploy failed with exit code $LASTEXITCODE."
+          }
