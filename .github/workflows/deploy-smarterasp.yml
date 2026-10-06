@@ -47,10 +47,11 @@ jobs:
             throw "Microsoft WebDeploy (msdeploy.exe) was not found on this runner."
           }
 
+          $sourcePath = (Resolve-Path -LiteralPath "./release").Path
           $destination = "contentPath=$env:WEBSITE_NAME,computerName=$env:SERVER_COMPUTER_NAME,userName=$env:SERVER_USERNAME,password=$env:SERVER_PASSWORD,authType=Basic"
           & $msdeploy `
             -verb:sync `
-            -source:contentPath=./release `
+            "-source:contentPath=$sourcePath" `
             "-dest:$destination" `
             -allowUntrusted `
             -enableRule:AppOffline `
