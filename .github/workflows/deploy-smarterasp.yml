@@ -48,7 +48,17 @@ jobs:
           }
 
           $sourcePath = (Resolve-Path -LiteralPath "./release").Path
-          $destination = "contentPath=$env:WEBSITE_NAME,computerName=$env:SERVER_COMPUTER_NAME,userName=$env:SERVER_USERNAME,password=$env:SERVER_PASSWORD,authType=Basic"
+          $siteName = $env:WEBSITE_NAME
+          if ([string]::IsNullOrWhiteSpace($siteName)) {
+            $siteName = "subliminalcart3l-001-site1"
+          } else {
+            $siteName = $siteName.Trim()
+          }
+          if ($siteName -ne "subliminalcart3l-001-site1") {
+            throw "WEBSITE_NAME does not match the configured SmarterASP site."
+          }
+
+          $destination = "contentPath=$siteName,computerName=$($env:SERVER_COMPUTER_NAME),userName=$($env:SERVER_USERNAME),password=$($env:SERVER_PASSWORD),authType=Basic"
           & $msdeploy `
             -verb:sync `
             "-source:contentPath=$sourcePath" `
