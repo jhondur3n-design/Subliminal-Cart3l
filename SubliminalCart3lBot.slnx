@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="SubliminalCart3lBot.csproj" />
+  <Project Path="tests/SubliminalCart3lBot.Tests.csproj" />
+</Solution>

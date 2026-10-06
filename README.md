@@ -1,56 +1,83 @@
-# Subliminal Cart Telegram Store
+# Subliminal Cart 3L Telegram Bot
 
-An async Telegram digital-product store using Python 3.12+, `python-telegram-bot`, Telegram Stars (XTR), SQLAlchemy, and SQLite. The bot uses polling for local or single-process deployment; the application lifecycle is kept separate so a webhook runner can be added later.
+ASP.NET Core Minimal API on .NET 10. It receives Telegram updates through an HTTPS webhook, stores customers, products, and orders in SQLite, accepts Telegram Stars (`XTR`), and delivers WAV files after verified payment. It does not require Python or Docker.
 
-## Requirements
+## Features
 
-- Python 3.12 or newer
-- A Telegram bot token from [@BotFather](https://t.me/BotFather)
-- Your Telegram numeric user ID for the administrator setting
+- `GET /` and `GET /api/telegram/status` online checks.
+- Secret-validated `POST /api/telegram/webhook`.
+- `/start`, `/help`, `/products`, `/terms`, and `/support` Telegram commands.
+- Inline product and purchase buttons with callback-query handling.
+- Telegram Stars invoices, pre-checkout validation, and successful-payment handling.
+- Unique invoice payload and Telegram charge IDs with atomic pending-to-paid transitions to prevent duplicate fulfillment.
+- Owner-only product setup for Telegram ID `6197139693`: send `/addproduct <stars> <name> | <description>`, then upload the WAV as a `.wav` document.
+- SQLite persistence in `App_Data/subliminalcart3l.db` by default.
 
-## Setup
+## Configuration
 
-1. Create a bot with BotFather using `/newbot` and copy its token. Keep the token private.
-2. Optionally set a bot description with `/setdescription` and a command menu with `/setcommands` (`start - Open the store`, `help - Show the store menu`, `admin - Admin panel`). Admin commands remain protected by the configured numeric ID. Inline mode is not required. Telegram Stars payments use currency `XTR` and an empty provider token, so no external payment provider is needed.
-3. Create and activate a virtual environment, then install dependencies:
+The committed `appsettings.json` contains only non-secret defaults. Never put the BotFather token or webhook secret in source control, `appsettings.json`, or `appsettings.example.json`.
 
-	```bash
-	python3.12 -m venv .venv
-	source .venv/bin/activate
-	python -m pip install -r requirements.txt
-	```
+Required ASP.NET environment variables (SmarterASP application settings use `__` for configuration `:`):
 
-4. Copy `.env.example` to `.env` and set `BOT_TOKEN`, `ADMIN_TELEGRAM_ID`, and (optionally) `SUPPORT_USERNAME`. Use your numeric Telegram account ID, not your username.
-5. Start the bot:
+| Environment variable | Configuration key | Required value |
+| --- | --- | --- |
+| `Telegram__BotToken` | `Telegram:BotToken` | BotFather token. Enter only in SmarterASP's secure application/environment settings. |
+| `Telegram__WebhookSecret` | `Telegram:WebhookSecret` | Random 32-256 character secret using letters, numbers, `_`, or `-`. Keep private. |
+| `Telegram__PublicBaseUrl` | `Telegram:PublicBaseUrl` | `https://subliminalcart3l-001-site1.ctempurl.com/` |
 
-	```bash
-	python bot.py
-	```
+The owner ID is fixed in the application at `6197139693`. Optional settings are `Store__SupportUsername`, `Store__Terms`, and `Storage__DatabasePath`. The database path defaults to `App_Data/subliminalcart3l.db`; make sure the IIS app identity has write access to `App_Data` and that this directory persists across deployments.
 
-	The SQLite database and tables are created automatically on startup. The default database is `store.db` in the project directory. Set `DATABASE_URL` to change it.
+## Build
 
-## Admin operations
-
-Open the bot as the account whose ID is configured in `ADMIN_TELEGRAM_ID`, then use `/admin` for the command list. `/addproduct` asks for a name, description, positive whole-number Stars price, and product document. The bot stores the document's Telegram `file_id`; it can also accept a file ID instead of an upload. Use `/products` to edit a product's price, description, delivery file, or active status. Other commands are `/orders`, `/customers`, `/stats`, and `/broadcast`. `/cancel` ends an in-progress admin prompt. Products do not require Python code changes.
-
-Keep the original uploaded document in your bot's account and avoid deleting the message/file it came from. The bot delivers using Telegram's saved file ID.
-
-## Customer and payment flow
-
-Customers use `/start` to register and see Store, My Purchases, and Support. They can browse active products, open descriptions, and receive an XTR invoice. The bot stores a pending order before sending the invoice. Telegram's pre-checkout event must match the buyer, pending payload, active product, saved price, currency, and invoice age. A file is sent only after Telegram sends `successful_payment` and the bot verifies the confirmed payer, payload, XTR amount, currency, and unique payment charge ID. Paid purchases can be sent again from My Purchases.
-
-For testing, use a private bot chat and complete an invoice with Telegram Stars using an account with an available Stars balance. Telegram does not provide a local fake-payment switch for Stars; make sure to understand any real Stars expenditure before testing. For a no-charge smoke test, use `/start`, browse the store, and test admin product management without completing checkout.
-
-## Tests
+Install the .NET 10 SDK, then run from the repository root:
 
 ```bash
-python -m pytest -q
+dotnet restore SubliminalCart3lBot.csproj --runtime win-x64
+dotnet build SubliminalCart3lBot.csproj --configuration Release --runtime win-x64 --no-restore
+dotnet publish SubliminalCart3lBot.csproj --configuration Release --runtime win-x64 --self-contained false --no-build --no-restore --output publish
 ```
 
-GitHub Actions runs this test suite on pushes and pull requests. Actions is CI only, not a bot host.
+## Automated Tests
 
-## Deployment
+The root solution includes the production app and `tests/SubliminalCart3lBot.Tests.csproj`. Tests use isolated temporary SQLite databases and a fake Telegram HTTP handler; they do not call Telegram, use a real BotFather token, or make payments. Run the full check from the repository root:
 
-Run the bot on an always-on Python host or VPS. Keep `.env` private, provision persistent storage for the SQLite database, install dependencies, and run `python bot.py` under a process supervisor such as systemd or a container restart policy. Back up the database and monitor the process logs. Do not use GitHub Actions as a 24/7 server. For horizontal or multi-instance deployment, move from SQLite to a server database and add suitable delivery/job coordination before running multiple workers.
+```bash
+dotnet restore
+dotnet build --configuration Release
+dotnet test --configuration Release
+```
 
-The handlers and database initialization are registered through the PTB `Application` lifecycle; polling currently starts in `bot.py`. A future webhook deployment can supply a webhook runner and HTTPS endpoint while reusing the same handlers and persistence layer.
+## SmarterASP.NET Deployment
+
+1. Create/select a SmarterASP.NET site that supports ASP.NET Core .NET 10 and HTTPS. Configure the site's HTTPS certificate and confirm the site root is mapped to its ASP.NET Core application directory.
+2. Build and publish using the commands above. Upload the **contents** of `publish/` to the site's application root, including the generated `web.config`, `SubliminalCart3lBot.exe`, `SubliminalCart3lBot.dll`, `.deps.json`, `.runtimeconfig.json`, appsettings files, and published dependencies. Do not deploy the old Python files, a Docker image, or only the source `.cs` files.
+3. In SmarterASP.NET's secure application/environment settings, create `Telegram__BotToken`, `Telegram__WebhookSecret`, and `Telegram__PublicBaseUrl` with the values described above. Enter the BotFather token directly into the secure `Telegram__BotToken` setting; do not paste it into a file or command history. Generate a random webhook secret and enter it directly into `Telegram__WebhookSecret`. Do not send either secret in logs, support requests, or source control.
+4. Set `ASPNETCORE_ENVIRONMENT` to `Production` if the control panel does not already do so. Ensure `App_Data` is writable and persistent. If changing the database location, create `Storage__DatabasePath` with a writable path.
+5. Restart/recycle the site from the SmarterASP.NET control panel after publishing and saving settings. The application creates its SQLite tables at startup.
+6. Verify the deployed site responds successfully before configuring Telegram:
+
+   ```text
+   GET https://subliminalcart3l-001-site1.ctempurl.com/
+   ```
+
+   Expected JSON: `{"status":"online","service":"SubliminalCart3lBot"}`. The status endpoint is `https://subliminalcart3l-001-site1.ctempurl.com/api/telegram/status`.
+7. Only after deployment and the root check succeed, register the Telegram webhook from a trusted machine where the BotFather token and the exact same webhook secret are available as shell variables `BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET`:
+
+   ```bash
+   curl --fail-with-body --silent --show-error --request POST \
+     "https://api.telegram.org/bot${BOT_TOKEN}/setWebhook" \
+     --data-urlencode "url=https://subliminalcart3l-001-site1.ctempurl.com/api/telegram/webhook" \
+     --data-urlencode "secret_token=${TELEGRAM_WEBHOOK_SECRET}"
+   ```
+
+The application does not register the webhook at startup. Do not run the registration command before the site is deployed and healthy.
+
+## Project Files
+
+- `SubliminalCart3lBot.csproj`: .NET 10 web project and SQLite package references.
+- `SubliminalCart3lBot.slnx`: root solution used by restore, build, and test commands.
+- `Program.cs`: configuration validation, dependency registration, health routes, and webhook route.
+- `Services/`: Telegram Bot API client, update processing, `ProductCatalog`, and persistent store/order logic.
+- `tests/`: isolated catalog, payment, update-handler, and configuration tests.
+- `appsettings.json`: committed non-secret defaults.
+- `appsettings.example.json`: secret-free configuration template.
