@@ -58,14 +58,19 @@ jobs:
             throw "WEBSITE_NAME does not match the configured SmarterASP site."
           }
 
-          $destination = 'contentPath="{0}",computerName="{1}",userName="{2}",password="{3}",authType="Basic"' -f $siteName, $env:SERVER_COMPUTER_NAME, $env:SERVER_USERNAME, $env:SERVER_PASSWORD
+          $computerName = $env:SERVER_COMPUTER_NAME
+          $username = $env:SERVER_USERNAME
+          $password = $env:SERVER_PASSWORD
+          $deployArguments = @(
+            "-verb:sync"
+            "-source:contentPath=$sourcePath"
+            "-dest:contentPath=$siteName,computerName=$computerName,userName=$username,password=$password,authType=Basic"
+            "-allowUntrusted"
+            "-enableRule:AppOffline"
+            "-enableRule:DoNotDeleteRule"
+          )
           & $msdeploy `
-            -verb:sync `
-            "-source:contentPath=$sourcePath" `
-            "-dest:$destination" `
-            -allowUntrusted `
-            -enableRule:AppOffline `
-            -enableRule:DoNotDeleteRule
+            @deployArguments
 
           if ($LASTEXITCODE -ne 0) {
             throw "WebDeploy failed with exit code $LASTEXITCODE."
